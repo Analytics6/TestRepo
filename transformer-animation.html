@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer Architecture — Interactive Animation</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --accent: #2563eb;
+    --embed: #0d9488;
+    --pos: #7c3aed;
+    --attn: #d97706;
+    --ffn: #db2777;
+    --norm: #059669;
+    --decoder: #4f46e5;
+    --output: #dc2626;
+    --highlight: rgba(37, 99, 235, 0.12);
+    --glow: rgba(37, 99, 235, 0.35);
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --mono: 'Cascadia Code', 'Consolas', monospace;
+    --radius: 12px;
+    --transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.35rem;
+  }
+
+  header p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: calc(100vh - 100px);
+  }
+
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-left: none; border-top: 1px solid var(--border); }
+  }
+
+  main {
+    padding: 1.5rem 2rem 2rem;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 1.25rem;
+    overflow-y: auto;
+    box-shadow: -2px 0 8px rgba(15, 23, 42, 0.04);
+  }
+
+  .sidebar h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .btn:hover { background: #e2e8f0; border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+  }
+
+  .speed-control input { width: 100px; accent-color: var(--accent); }
+
+  .progress-wrap {
+    margin-bottom: 1.5rem;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--embed));
+    border-radius: 3px;
+    transition: width var(--transition);
+    width: 0%;
+  }
+
+  .phase-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .phase-label strong { color: var(--accent); }
+
+  .phase-list {
+    list-style: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .phase-list li {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .phase-list li.active {
+    background: var(--highlight);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .phase-list li.done { color: var(--norm); }
+
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    box-shadow: var(--shadow);
+  }
+
+  .concept-card h4 {
+    font-size: 0.75rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .formula {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin: 0.75rem 0;
+    color: #0f766e;
+    overflow-x: auto;
+  }
+
+  .callout-info, .callout-insight, .callout-math, .callout-warning {
+    border-radius: var(--radius);
+    padding: 1rem 1.15rem;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    border-left: 4px solid;
+  }
+
+  .callout-info {
+    background: #eff6ff;
+    border-color: var(--accent);
+    color: #1e40af;
+  }
+
+  .callout-insight {
+    background: #ecfdf5;
+    border-color: var(--norm);
+    color: #065f46;
+  }
+
+  .callout-math {
+    background: #faf5ff;
+    border-color: var(--pos);
+    color: #5b21b6;
+  }
+
+  .callout-warning {
+    background: #fffbeb;
+    border-color: var(--attn);
+    color: #92400e;
+  }
+
+  .callout-info strong, .callout-insight strong, .callout-math strong, .callout-warning strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .learn-more {
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .learn-more summary {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent);
+    background: var(--surface2);
+    list-style: none;
+  }
+
+  .learn-more summary::-webkit-details-marker { display: none; }
+
+  .learn-more summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+
+  .learn-more[open] summary::before { transform: rotate(90deg); }
+
+  .learn-more .learn-body {
+    padding: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.82rem;
+  }
+
+  .compare-table th, .compare-table td {
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+  }
+
+  .compare-table th {
+    background: var(--surface2);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .compare-table td { color: var(--text-muted); }
+
+  .token-id-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.82rem;
+  }
+
+  .token-id-table th, .token-id-table td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+  }
+
+  .token-id-table th { background: var(--surface2); color: var(--text); }
+  .token-id-table td:first-child { font-weight: 600; color: var(--embed); }
+
+  .sine-wave-svg {
+    width: 100%;
+    max-width: 480px;
+    margin: 1rem auto;
+    display: block;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .edu-section {
+    margin-bottom: 1.5rem;
+    opacity: 0.35;
+    transition: opacity var(--transition);
+  }
+
+  .edu-section.active {
+    opacity: 1;
+  }
+
+  .edu-section h2 {
+    font-size: 1.35rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .badge-overview { background: var(--accent); color: #ffffff; }
+  .badge-embed { background: var(--embed); color: #ffffff; }
+  .badge-pos { background: var(--pos); color: #ffffff; }
+  .badge-attn { background: var(--attn); color: #ffffff; }
+  .badge-ffn { background: var(--ffn); color: #ffffff; }
+  .badge-norm { background: var(--norm); color: #ffffff; }
+  .badge-decoder { background: var(--decoder); color: #ffffff; }
+  .badge-output { background: var(--output); color: #ffffff; }
+
+  .edu-section p { color: var(--text-muted); margin-bottom: 0.75rem; }
+
+  .viz-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-top: 1rem;
+    min-height: 280px;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+
+  .viz-panel.dimmed .viz-component:not(.active) {
+    opacity: 0.25;
+    filter: grayscale(0.5);
+  }
+
+  .tokens-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+
+  .token {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .token.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .token.highlight-embed { border-color: var(--embed); box-shadow: 0 0 16px rgba(13, 148, 136, 0.25); }
+  .token.highlight-pos { border-color: var(--pos); }
+  .token.highlight-attn { border-color: var(--attn); }
+
+  .embed-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .embed-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: all 0.5s ease;
+  }
+
+  .embed-row.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .embed-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: right;
+    color: var(--text-muted);
+  }
+
+  .vector-bars {
+    display: flex;
+    gap: 2px;
+    height: 28px;
+  }
+
+  .vector-bar {
+    width: 8px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.3s, height 0.3s;
+    align-self: center;
+  }
+
+  .vector-bar.filled {
+    animation: barPulse 0.6s ease forwards;
+  }
+
+  @keyframes barPulse {
+    0% { transform: scaleY(0.3); }
+    50% { transform: scaleY(1.2); }
+    100% { transform: scaleY(1); }
+  }
+
+  .pos-add-viz {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+
+  .pos-block {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.5s ease;
+  }
+
+  .pos-block.visible { opacity: 1; transform: scale(1); }
+
+  .pos-block.embed-block { background: rgba(13, 148, 136, 0.1); border: 1px solid var(--embed); color: var(--embed); }
+  .pos-block.pos-enc-block { background: rgba(124, 58, 237, 0.08); border: 1px solid var(--pos); color: var(--pos); }
+  .pos-block.result-block { background: rgba(37, 99, 235, 0.08); border: 1px solid var(--accent); color: var(--accent); }
+
+  .operator {
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .operator.visible { opacity: 1; }
+
+  .encoder-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .encoder-layer {
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    text-align: center;
+    font-size: 0.85rem;
+    transition: all var(--transition);
+    position: relative;
+  }
+
+  .encoder-layer.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--highlight);
+    background: rgba(37, 99, 235, 0.06);
+  }
+
+  .encoder-layer.attn-active { border-color: var(--attn); box-shadow: 0 0 20px rgba(217, 119, 6, 0.15); }
+  .encoder-layer.ffn-active { border-color: var(--ffn); box-shadow: 0 0 20px rgba(219, 39, 119, 0.15); }
+  .encoder-layer.norm-active { border-color: var(--norm); box-shadow: 0 0 20px rgba(5, 150, 105, 0.15); }
+
+  .qkv-viz {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0;
+  }
+
+  .matrix-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: all 0.5s ease;
+    box-shadow: var(--shadow);
+  }
+
+  .matrix-box.visible { opacity: 1; transform: scale(1); }
+  .matrix-box.q { border-color: #3b82f6; }
+  .matrix-box.k { border-color: #8b5cf6; }
+  .matrix-box.v { border-color: #f97316; }
+
+  .matrix-box .label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .matrix-box.q .label { color: #3b82f6; }
+  .matrix-box.k .label { color: #8b5cf6; }
+  .matrix-box.v .label { color: #f97316; }
+
+  .mini-matrix {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    margin: 0 auto;
+    max-width: 100px;
+  }
+
+  .mini-cell {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    background: var(--surface2);
+    font-size: 0.55rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: background 0.3s;
+  }
+
+  .mini-cell.active { background: var(--accent); color: #ffffff; }
+
+  .arrow-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .arrow {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .arrow.visible { opacity: 1; }
+
+  .heatmap-wrap {
+    margin: 1rem auto;
+    max-width: 400px;
+  }
+
+  .heatmap {
+    display: grid;
+    gap: 3px;
+  }
+
+  .heatmap-header {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .heatmap-header span {
+    flex: 1;
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .heatmap-row {
+    display: flex;
+    gap: 3px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.4s ease;
+  }
+
+  .heatmap-row.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .heatmap-row-label {
+    width: 58px;
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+  }
+
+  .heatmap-cell {
+    flex: 1;
+    height: 28px;
+    border-radius: 4px;
+    background: var(--surface2);
+    transition: background 0.5s ease, transform 0.3s, color 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    font-weight: 600;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
+
+  .heatmap-cell.pop {
+    animation: cellPop 0.4s ease;
+  }
+
+  @keyframes cellPop {
+    0% { transform: scale(0.5); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  .residual-viz {
+    position: relative;
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+
+  .skip-arrow {
+    position: absolute;
+    left: 10%;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .skip-arrow.visible { opacity: 1; }
+
+  .skip-arrow svg path {
+    stroke: var(--norm);
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition: stroke-dashoffset 1s ease;
+  }
+
+  .skip-arrow.visible svg path {
+    stroke-dashoffset: 0;
+  }
+
+  .ffn-viz {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+
+  .ffn-layer {
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .ffn-layer.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .ffn-layer.expand {
+    background: rgba(219, 39, 119, 0.1);
+    border-color: var(--ffn);
+    color: var(--ffn);
+    transform: scale(1.1);
+  }
+
+  .ffn-layer.contract {
+    background: rgba(219, 39, 119, 0.18);
+    border-color: var(--ffn);
+    color: #9d174d;
+  }
+
+  .ffn-arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .ffn-arrow.visible { opacity: 1; }
+
+  .arch-svg {
+    width: 100%;
+    max-width: 520px;
+    margin: 1rem auto;
+    display: block;
+  }
+
+  .arch-svg .block {
+    transition: opacity var(--transition), filter var(--transition);
+  }
+
+  .arch-svg .block.dim { opacity: 0.3; }
+  .arch-svg .block.glow { filter: drop-shadow(0 0 8px var(--glow)); }
+
+  .output-viz {
+    text-align: center;
+    margin: 1rem 0;
+  }
+
+  .prob-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 350px;
+    margin: 0 auto;
+  }
+
+  .prob-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.4s ease;
+  }
+
+  .prob-row.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .prob-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 70px;
+    text-align: right;
+  }
+
+  .prob-bar-wrap {
+    flex: 1;
+    height: 22px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .prob-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--output), #f97316);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .prob-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 45px;
+  }
+
+  .tooltip-term {
+    position: relative;
+    cursor: help;
+    border-bottom: 1px dotted var(--accent);
+    color: var(--accent);
+  }
+
+  .tooltip-term::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: var(--text);
+    white-space: nowrap;
+    max-width: 280px;
+    white-space: normal;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 100;
+    box-shadow: var(--shadow-md);
+  }
+
+  .tooltip-term:hover::after { opacity: 1; }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  @media (max-width: 600px) {
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.5s ease;
+    box-shadow: var(--shadow);
+  }
+
+  .compare-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .compare-card h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .compare-card.encoder h4 { color: var(--accent); }
+  .compare-card.decoder h4 { color: var(--decoder); }
+
+  .sentence-display {
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(13, 148, 136, 0.06));
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin: 1rem 0;
+    box-shadow: var(--shadow);
+  }
+
+  .sentence-display .word {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s ease;
+    margin: 0 0.15rem;
+  }
+
+  .sentence-display .word.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .viz-component { transition: opacity var(--transition); }
+
+  footer {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .calc-step {
+    background: #f1f5f9;
+    border-left: 3px solid #3b82f6;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+
+  .calc-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75rem 0;
+  }
+
+  .calc-table td, .calc-table th {
+    border: 1px solid #e2e8f0;
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+
+  .calc-table th {
+    background: var(--surface2);
+    font-weight: 600;
+  }
+
+  .calc-highlight {
+    background: #fef3c7;
+  }
+
+  .formula-block {
+    background: #eff6ff;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+
+  .formula-block h4 {
+    color: var(--accent);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .worked-example {
+    margin: 1.25rem 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .worked-example > summary {
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent);
+    background: var(--surface2);
+    list-style: none;
+  }
+
+  .worked-example > summary::-webkit-details-marker { display: none; }
+
+  .worked-example > summary::before {
+    content: '▸ ';
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+
+  .worked-example[open] > summary::before { transform: rotate(90deg); }
+
+  .worked-example .worked-body {
+    padding: 1rem;
+  }
+
+  .calc-token-label {
+    display: inline-block;
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 4px;
+    padding: 0.1rem 0.45rem;
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+  }
+
+  .calc-section-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 1.25rem 0 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Transformer Architecture</h1>
+  <p>An animated walkthrough of how transformers process language — using a data science example sentence</p>
+</header>
+
+<div class="layout">
+  <main>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="phase-label">Phase <strong id="phaseNum">1</strong> of <strong id="phaseTotal">16</strong>: <span id="phaseTitle">Overview</span></div>
+    </div>
+
+  <div class="controls">
+    <button class="btn" id="btnPrev" title="Previous phase">← Previous</button>
+    <button class="btn primary" id="btnPlay" title="Auto-play">▶ Play</button>
+    <button class="btn" id="btnNext" title="Next phase">Next →</button>
+    <button class="btn" id="btnReset" title="Reset to start">↺ Reset</button>
+  </div>
+  <div class="speed-control">
+    <label for="speedRange">Auto-play speed:</label>
+    <input type="range" id="speedRange" min="1" max="5" value="3">
+    <span id="speedLabel">Normal</span>
+  </div>
+
+  <div id="eduContent"></div>
+  </main>
+
+  <aside class="sidebar">
+    <h3>Phases</h3>
+    <ul class="phase-list" id="phaseList"></ul>
+
+    <h3>Key Concepts</h3>
+    <div class="concept-card">
+      <h4>Self-Attention Formula</h4>
+      <div class="formula">Attention(Q,K,V) = softmax(QK<sup>T</sup> / √d<sub>k</sub>) · V</div>
+      <p style="color:var(--text-muted);font-size:0.8rem;">Each token asks every other token: "How relevant are you to me?" Scores are normalized, then used to blend value vectors.</p>
+    </div>
+    <div class="concept-card">
+      <h4>Parallelization</h4>
+      <p style="color:var(--text-muted);font-size:0.8rem;">Unlike RNNs, all tokens are processed simultaneously. Self-attention computes all pairwise relationships in one matrix operation — enabling massive GPU parallelism.</p>
+    </div>
+    <div class="concept-card">
+      <h4>Context Window</h4>
+      <p style="color:var(--text-muted);font-size:0.8rem;">The maximum sequence length the model can attend over. Larger windows (e.g. 128K tokens) let the model consider more context, but increase memory quadratically with attention.</p>
+    </div>
+    <div class="concept-card">
+      <h4>Example Sentence</h4>
+      <p style="color:var(--embed);font-size:0.85rem;font-weight:600;">"i like data science and machine learning"</p>
+      <p style="color:var(--text-muted);font-size:0.78rem;margin-top:0.4rem;">7 tokens — a perfect length for tracing attention patterns across two related phrases.</p>
+    </div>
+  </aside>
+</div>
+
+<footer>Self-contained educational visualization — open in any modern browser. No build step required.</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  const TOKENS = ['i', 'like', 'data', 'science', 'and', 'machine', 'learning'];
+  const TOKEN_IDS = [152, 206, 2958, 3347, 203, 3698, 4679];
+  const EMBED_DIM = 8;
+  const SENTENCE = 'i like data science and machine learning';
+  const FULL_MODEL_DIM = 512;
+  const NUM_HEADS = 8;
+  const HEAD_DIM = FULL_MODEL_DIM / NUM_HEADS;
+
+  // Seeded pseudo-random for consistent visuals
+  function seededRandom(seed) {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  }
+
+  function generateVector(seed, dim) {
+    return Array.from({ length: dim }, (_, i) => {
+      const v = seededRandom(seed + i * 7);
+      return Math.round(v * 100) / 100;
+    });
+  }
+
+  const EMBEDDINGS = TOKENS.map((_, i) => generateVector(i * 13 + 1, EMBED_DIM));
+  const POS_ENCODING = TOKENS.map((_, i) => generateVector(i * 17 + 100, EMBED_DIM));
+  const COMBINED = EMBEDDINGS.map((e, i) => e.map((v, j) => Math.round((v + POS_ENCODING[i][j]) * 100) / 100));
+
+  /* ── Hand-computable worked example (d_model = 4) ── */
+  const CALC_D = 4;
+  const CALC_EPS = 1e-5;
+  const CALC_TOKENS = ['data', 'science', 'learning'];
+  const CALC_IDX = [2, 3, 6];
+
+  const CALC_EMB = {
+    'i': [0.10, 0.00, -0.20, 0.15],
+    'like': [0.30, 0.10, 0.00, -0.10],
+    'data': [0.20, -0.10, 0.50, 0.30],
+    'science': [0.40, 0.20, 0.45, 0.25],
+    'and': [0.05, 0.15, 0.10, 0.00],
+    'machine': [0.35, -0.05, 0.40, 0.20],
+    'learning': [0.25, 0.30, 0.55, 0.35],
+  };
+
+  const W_Q = [
+    [0.10, 0.20, 0.00, 0.10],
+    [0.00, 0.30, 0.10, 0.00],
+    [0.20, 0.00, 0.15, 0.10],
+    [0.10, 0.10, 0.00, 0.20],
+  ];
+  const W_K = [
+    [0.12, 0.00, 0.10, 0.05],
+    [0.00, 0.28, 0.00, 0.08],
+    [0.15, 0.10, 0.16, 0.00],
+    [0.06, 0.04, 0.00, 0.22],
+  ];
+  const W_V = [
+    [0.20, 0.10, 0.30, 0.05],
+    [0.25, 0.12, 0.28, 0.06],
+    [0.18, 0.08, 0.22, 0.04],
+    [0.15, 0.20, 0.10, 0.08],
+  ];
+
+  const W1_FFN = [
+    [0.20, -0.10, 0.15, 0.05, 0.10, -0.05],
+    [0.10, 0.25, -0.15, 0.20, 0.05, 0.10],
+    [-0.05, 0.15, 0.30, -0.10, 0.20, 0.05],
+    [0.15, 0.05, 0.10, 0.25, -0.10, 0.15],
+  ];
+  const B1_FFN = [0.05, -0.02, 0.03, 0.00, 0.04, -0.01];
+  const W2_FFN = [
+    [0.18, 0.10, -0.08, 0.12],
+    [0.12, 0.22, 0.15, -0.10],
+    [-0.05, 0.08, 0.25, 0.08],
+    [0.10, -0.12, 0.10, 0.20],
+    [0.15, 0.05, -0.05, 0.10],
+    [0.08, 0.14, 0.12, -0.06],
+  ];
+  const B2_FFN = [0.02, -0.03, 0.01, 0.04];
+  const FFN_INPUT = [0.10, -0.20, 0.30, 0.05];
+
+  function fmt(n, d) {
+    const dec = d === undefined ? 3 : d;
+    return (Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec)).toFixed(dec);
+  }
+
+  function fmtVec(v, d) {
+    return '[' + v.map(function(x) { return fmt(x, d); }).join(', ') + ']';
+  }
+
+  function fmtMatrix(m, d) {
+    return m.map(function(row) { return '  [' + row.map(function(x) { return fmt(x, d); }).join(', ') + ']'; }).join('\n');
+  }
+
+  function computePE(pos, d) {
+    d = d || CALC_D;
+    var pe = [];
+    var steps = [];
+    for (var i = 0; i < d / 2; i++) {
+      var exp = (2 * i) / d;
+      var divisor = Math.pow(10000, exp);
+      var angleSin = pos / divisor;
+      var angleCos = pos / divisor;
+      var sinVal = Math.sin(angleSin);
+      var cosVal = Math.cos(angleCos);
+      pe.push(sinVal, cosVal);
+      steps.push({
+        i: i,
+        exp: exp,
+        divisor: divisor,
+        angleSin: angleSin,
+        angleCos: angleCos,
+        sinVal: sinVal,
+        cosVal: cosVal,
+        dimSin: 2 * i,
+        dimCos: 2 * i + 1,
+      });
+    }
+    return { pe: pe, steps: steps };
+  }
+
+  function vecAdd(a, b) {
+    return a.map(function(v, i) { return v + b[i]; });
+  }
+
+  function matVecMul(x, W) {
+    return W.map(function(row) {
+      return row.reduce(function(s, w, j) { return s + x[j] * w; }, 0);
+    });
+  }
+
+  function dotProduct(a, b) {
+    return a.reduce(function(s, v, i) { return s + v * b[i]; }, 0);
+  }
+
+  function softmax(arr) {
+    var exps = arr.map(function(x) { return Math.exp(x); });
+    var sum = exps.reduce(function(a, b) { return a + b; }, 0);
+    return exps.map(function(e) { return e / sum; });
+  }
+
+  function relu(x) {
+    return Math.max(0, x);
+  }
+
+  function layerNorm(x, eps) {
+    eps = eps || CALC_EPS;
+    var mu = x.reduce(function(a, b) { return a + b; }, 0) / x.length;
+    var variance = x.reduce(function(s, v) { return s + Math.pow(v - mu, 2); }, 0) / x.length;
+    var std = Math.sqrt(variance + eps);
+    var normalized = x.map(function(v) { return (v - mu) / std; });
+    return { mu: mu, variance: variance, std: std, normalized: normalized };
+  }
+
+  var ALL_PE = TOKENS.map(function(t, pos) {
+    var r = computePE(pos, CALC_D);
+    return { token: t, pos: pos, pe: r.pe, steps: r.steps };
+  });
+
+  var ALL_X = TOKENS.map(function(t, pos) {
+    var pe = ALL_PE[pos].pe;
+    var emb = CALC_EMB[t];
+    return { token: t, pos: pos, emb: emb, pe: pe, x: vecAdd(emb, pe) };
+  });
+
+  var CALC_X = CALC_TOKENS.map(function(t) {
+    return ALL_X[TOKENS.indexOf(t)];
+  });
+
+  var CALC_Q = CALC_X.map(function(item) {
+    return { token: item.token, x: item.x, q: matVecMul(item.x, W_Q) };
+  });
+  var CALC_K = CALC_X.map(function(item) {
+    return { token: item.token, x: item.x, k: matVecMul(item.x, W_K) };
+  });
+  var CALC_V = CALC_X.map(function(item) {
+    return { token: item.token, x: item.x, v: matVecMul(item.x, W_V) };
+  });
+
+  var CALC_RAW_SCORES = CALC_Q.map(function(qItem, qi) {
+    return CALC_K.map(function(kItem) {
+      return dotProduct(qItem.q, kItem.k) / Math.sqrt(CALC_D);
+    });
+  });
+
+  var CALC_ATTN = CALC_RAW_SCORES.map(function(row) {
+    return softmax(row);
+  });
+
+  var LEARNING_IDX = 2;
+  var CALC_ATTN_OUT = CALC_V[0].v.map(function(_, di) {
+    return CALC_ATTN[LEARNING_IDX].reduce(function(s, alpha, ki) {
+      return s + alpha * CALC_V[ki].v[di];
+    }, 0);
+  });
+
+  var LEARNING_X = ALL_X[6].x;
+  var CALC_RESIDUAL = vecAdd(CALC_ATTN_OUT, LEARNING_X);
+  var CALC_LAYERNORM = layerNorm(CALC_RESIDUAL);
+
+  var FFN_H_PRE = B1_FFN.map(function(_, col) {
+    return FFN_INPUT.reduce(function(s, xv, ri) { return s + xv * W1_FFN[ri][col]; }, 0) + B1_FFN[col];
+  });
+  var FFN_H = FFN_H_PRE.map(function(h) { return relu(h); });
+  var FFN_OUT = B2_FFN.map(function(_, col) {
+    return FFN_H.reduce(function(s, hv, ri) { return s + hv * W2_FFN[ri][col]; }, 0) + B2_FFN[col];
+  });
+
+  function buildMatVecSteps(label, x, W, result) {
+    var html = '<div class="calc-step"><strong>Step: ' + label + '</strong><br>';
+    html += 'Input x = ' + fmtVec(x) + '<br><br>';
+    W.forEach(function(row, ri) {
+      var terms = x.map(function(xv, j) { return fmt(xv) + '×' + fmt(row[j]); });
+      var prods = x.map(function(xv, j) { return xv * row[j]; });
+      html += result[ri] !== undefined
+        ? label + '[' + ri + '] = ' + terms.join(' + ') + ' = ' + prods.map(function(p) { return fmt(p); }).join(' + ') + ' = <strong>' + fmt(result[ri]) + '</strong><br>'
+        : '';
+    });
+    html += '<br>' + label + ' = ' + fmtVec(result) + '</div>';
+    return html;
+  }
+
+  function buildPECalcSection() {
+    var html = '<div class="formula-block"><h4>Worked Example: Positional Encoding (d<sub>model</sub> = 4)</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;">Formula: PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>), &nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)</p>';
+    html += '<p style="font-size:0.85rem;margin-bottom:0.75rem;">All <strong>7 tokens</strong> computed below. Divisors: i=0 → 10000<sup>0/4</sup> = 1; i=1 → 10000<sup>2/4</sup> = 100.</p></div>';
+
+    html += '<table class="calc-table"><thead><tr><th>pos</th><th>Token</th><th>PE vector [sin, cos, sin, cos]</th></tr></thead><tbody>';
+    ALL_PE.forEach(function(item) {
+      html += '<tr><td>' + item.pos + '</td><td><span class="calc-token-label">' + item.token + '</span></td><td>' + fmtVec(item.pe, 3) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    ALL_PE.forEach(function(item) {
+      html += '<details class="worked-example"><summary>Step-by-step calculation for "' + item.token + '" (pos = ' + item.pos + ')</summary><div class="worked-body">';
+      item.steps.forEach(function(st) {
+        html += '<div class="calc-step">';
+        html += '<strong>Dimension ' + st.dimSin + ' (sin):</strong> 10000<sup>' + st.exp + '</sup> = ' + fmt(st.divisor, 0) + ', angle = ' + item.pos + '/' + fmt(st.divisor, 0) + ' = ' + fmt(st.angleSin, 4) + ', sin(' + fmt(st.angleSin, 4) + ') = <strong>' + fmt(st.sinVal) + '</strong><br>';
+        html += '<strong>Dimension ' + st.dimCos + ' (cos):</strong> 10000<sup>' + st.exp + '</sup> = ' + fmt(st.divisor, 0) + ', angle = ' + item.pos + '/' + fmt(st.divisor, 0) + ' = ' + fmt(st.angleCos, 4) + ', cos(' + fmt(st.angleCos, 4) + ') = <strong>' + fmt(st.cosVal) + '</strong>';
+        html += '</div>';
+      });
+      html += '<div class="calc-step calc-highlight"><strong>PE(' + item.pos + ') = ' + fmtVec(item.pe) + '</strong></div>';
+      html += '</div></details>';
+    });
+
+    html += '<div class="calc-section-title">Token Embedding + Positional Encoding = Input Vector</div>';
+    html += '<table class="calc-table"><thead><tr><th>Token</th><th>E(token)</th><th>PE(pos)</th><th>X = E + PE</th></tr></thead><tbody>';
+    ALL_X.forEach(function(item) {
+      html += '<tr><td><span class="calc-token-label">' + item.token + '</span></td>';
+      html += '<td>' + fmtVec(item.emb) + '</td><td>' + fmtVec(item.pe) + '</td><td><strong>' + fmtVec(item.x) + '</strong></td></tr>';
+    });
+    html += '</tbody></table>';
+
+    ALL_X.forEach(function(item) {
+      html += '<details class="worked-example"><summary>Addition for "' + item.token + '"</summary><div class="worked-body"><div class="calc-step">';
+      item.emb.forEach(function(e, di) {
+        html += 'dim ' + di + ': ' + fmt(e) + ' + ' + fmt(item.pe[di]) + ' = <strong>' + fmt(item.x[di]) + '</strong><br>';
+      });
+      html += '<br><strong>X("' + item.token + '") = ' + fmtVec(item.x) + '</strong></div></div></details>';
+    });
+
+    return html;
+  }
+
+  function buildQKVCalcSection() {
+    var html = '<div class="formula-block"><h4>Worked Example: Q, K, V Projections (d<sub>model</sub> = 4, d<sub>k</sub> = 4)</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);">Q = X · W<sub>Q</sub>, &nbsp; K = X · W<sub>K</sub>, &nbsp; V = X · W<sub>V</sub> — shown for tokens <span class="calc-token-label">data</span>, <span class="calc-token-label">science</span>, <span class="calc-token-label">learning</span></p></div>';
+
+    html += '<div class="calc-step"><strong>Weight matrices (4×4):</strong><br><br>W<sub>Q</sub>:<br><pre style="margin:0.5rem 0;">' + fmtMatrix(W_Q) + '</pre>';
+    html += 'W<sub>K</sub>:<br><pre style="margin:0.5rem 0;">' + fmtMatrix(W_K) + '</pre>';
+    html += 'W<sub>V</sub>:<br><pre style="margin:0.5rem 0;">' + fmtMatrix(W_V) + '</pre></div>';
+
+    CALC_X.forEach(function(item, ti) {
+      html += '<details class="worked-example"' + (ti === 0 ? ' open' : '') + '><summary>Step-by-step Q/K/V for "<span class="calc-token-label">' + item.token + '</span>"</summary><div class="worked-body">';
+      html += '<div class="calc-step">X("' + item.token + '") = ' + fmtVec(item.x) + '</div>';
+      html += buildMatVecSteps('Q("' + item.token + '")', item.x, W_Q, CALC_Q[ti].q);
+      html += buildMatVecSteps('K("' + item.token + '")', item.x, W_K, CALC_K[ti].k);
+      html += buildMatVecSteps('V("' + item.token + '")', item.x, W_V, CALC_V[ti].v);
+      html += '</div></details>';
+    });
+
+    html += '<div class="calc-section-title">Q, K, V Matrices (3×4)</div>';
+    html += '<table class="calc-table"><thead><tr><th>Token</th><th>Q</th><th>K</th><th>V</th></tr></thead><tbody>';
+    CALC_TOKENS.forEach(function(t, i) {
+      html += '<tr><td><span class="calc-token-label">' + t + '</span></td>';
+      html += '<td>' + fmtVec(CALC_Q[i].q) + '</td>';
+      html += '<td>' + fmtVec(CALC_K[i].k) + '</td>';
+      html += '<td>' + fmtVec(CALC_V[i].v) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function buildAttentionCalcSection() {
+    var sqrtDk = Math.sqrt(CALC_D);
+    var html = '<div class="formula-block"><h4>Worked Example: Attention Scores (3 tokens, d<sub>k</sub> = 4)</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);">Step 1: Raw scores = Q · K<sup>T</sup> / √d<sub>k</sub> = Q · K<sup>T</sup> / ' + fmt(sqrtDk) + '</p></div>';
+
+    html += '<div class="calc-section-title">Step 1: Compute all 9 raw scores</div>';
+    CALC_TOKENS.forEach(function(qTok, qi) {
+      html += '<details class="worked-example"><summary>Scores from query "<span class="calc-token-label">' + qTok + '</span>"</summary><div class="worked-body">';
+      CALC_TOKENS.forEach(function(kTok, ki) {
+        var q = CALC_Q[qi].q;
+        var k = CALC_K[ki].k;
+        var raw = dotProduct(q, k);
+        var scaled = raw / sqrtDk;
+        var terms = q.map(function(qv, j) { return fmt(qv) + '×' + fmt(k[j]); });
+        var prods = q.map(function(qv, j) { return qv * k[j]; });
+        html += '<div class="calc-step">';
+        html += 'score("' + qTok + '" → "' + kTok + '"): Q·K = ' + terms.join(' + ') + '<br>';
+        html += '= ' + prods.map(function(p) { return fmt(p); }).join(' + ') + ' = ' + fmt(raw) + '<br>';
+        html += 'Scaled: ' + fmt(raw) + ' / √' + CALC_D + ' = ' + fmt(raw) + ' / ' + fmt(sqrtDk) + ' = <strong>' + fmt(scaled) + '</strong>';
+        html += '</div>';
+      });
+      html += '</div></details>';
+    });
+
+    html += '<table class="calc-table"><thead><tr><th></th>';
+    CALC_TOKENS.forEach(function(t) { html += '<th>K: ' + t + '</th>'; });
+    html += '</tr></thead><tbody>';
+    CALC_TOKENS.forEach(function(qTok, qi) {
+      html += '<tr><th>Q: ' + qTok + '</th>';
+      CALC_RAW_SCORES[qi].forEach(function(s) { html += '<td>' + fmt(s) + '</td>'; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    html += '<div class="calc-section-title">Step 2: Softmax per row</div>';
+    var dataRow = CALC_RAW_SCORES[0];
+    var dataExps = dataRow.map(function(s) { return Math.exp(s); });
+    var dataSum = dataExps.reduce(function(a, b) { return a + b; }, 0);
+    html += '<details class="worked-example" open><summary>Complete softmax for row "<span class="calc-token-label">data</span>"</summary><div class="worked-body">';
+    html += '<div class="calc-step">Raw scores: ' + fmtVec(dataRow) + '</div>';
+    dataRow.forEach(function(s, i) {
+      html += '<div class="calc-step">exp(' + fmt(s) + ') = <strong>' + fmt(dataExps[i], 4) + '</strong></div>';
+    });
+    html += '<div class="calc-step">sum = ' + dataExps.map(function(e) { return fmt(e, 4); }).join(' + ') + ' = <strong>' + fmt(dataSum, 4) + '</strong></div>';
+    dataRow.forEach(function(s, i) {
+      html += '<div class="calc-step">softmax[' + i + '] = exp(' + fmt(s) + ') / ' + fmt(dataSum, 4) + ' = ' + fmt(dataExps[i], 4) + ' / ' + fmt(dataSum, 4) + ' = <strong>' + fmt(CALC_ATTN[0][i]) + '</strong> (→ ' + CALC_TOKENS[i] + ')</div>';
+    });
+    html += '</div></details>';
+
+    CALC_TOKENS.slice(1).forEach(function(tok, ri) {
+      var idx = ri + 1;
+      html += '<details class="worked-example"><summary>Softmax for row "<span class="calc-token-label">' + tok + '</span>"</summary><div class="worked-body">';
+      var row = CALC_RAW_SCORES[idx];
+      var exps = row.map(function(s) { return Math.exp(s); });
+      var sum = exps.reduce(function(a, b) { return a + b; }, 0);
+      html += '<div class="calc-step">Raw: ' + fmtVec(row) + ' → exp → sum = ' + fmt(sum, 4) + ' → softmax = ' + fmtVec(CALC_ATTN[idx]) + '</div>';
+      html += '</div></details>';
+    });
+
+    html += '<div class="calc-section-title">Final 3×3 Attention Matrix</div>';
+    html += '<table class="calc-table"><thead><tr><th></th>';
+    CALC_TOKENS.forEach(function(t) { html += '<th>' + t + '</th>'; });
+    html += '</tr></thead><tbody>';
+    CALC_TOKENS.forEach(function(qTok, qi) {
+      html += '<tr><th>' + qTok + '</th>';
+      CALC_ATTN[qi].forEach(function(a) { html += '<td class="calc-highlight">' + fmt(a) + '</td>'; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function buildWeightedSumCalcSection() {
+    var alphas = CALC_ATTN[LEARNING_IDX];
+    var html = '<div class="formula-block"><h4>Worked Example: Weighted Sum for "<span class="calc-token-label">learning</span>"</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);">Output("learning") = Σ α<sub>i</sub> · V(token<sub>i</sub>)</p></div>';
+
+    html += '<div class="calc-step">Attention weights α = ' + fmtVec(alphas) + ' (row "learning" from softmax)</div>';
+
+    CALC_TOKENS.forEach(function(t, i) {
+      var term = CALC_V[i].v.map(function(v) { return alphas[i] * v; });
+      html += '<div class="calc-step"><strong>Term ' + (i + 1) + ':</strong> ' + fmt(alphas[i]) + ' × ' + fmtVec(CALC_V[i].v) + ' = ' + fmtVec(term) + '</div>';
+    });
+
+    html += '<div class="calc-step calc-highlight"><strong>Sum = ' + fmtVec(CALC_ATTN_OUT) + '</strong><br><br>';
+    CALC_ATTN_OUT.forEach(function(v, di) {
+      var parts = CALC_TOKENS.map(function(_, i) { return fmt(alphas[i] * CALC_V[i].v[di]); });
+      html += 'dim ' + di + ': ' + parts.join(' + ') + ' = <strong>' + fmt(v) + '</strong><br>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function buildLayerNormCalcSection() {
+    var z = CALC_ATTN_OUT;
+    var x = LEARNING_X;
+    var sum = CALC_RESIDUAL;
+    var ln = CALC_LAYERNORM;
+    var html = '<div class="formula-block"><h4>Worked Example: Add &amp; Layer Norm for "<span class="calc-token-label">learning</span>"</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);">LayerNorm(z + x) = (z + x − μ) / √(σ² + ε), &nbsp; ε = ' + CALC_EPS + '</p></div>';
+
+    html += '<div class="calc-step"><strong>Step 1:</strong> Attention output z = ' + fmtVec(z) + '</div>';
+    html += '<div class="calc-step"><strong>Step 2:</strong> Residual x = X("learning") = ' + fmtVec(x) + '</div>';
+    html += '<div class="calc-step"><strong>Step 3:</strong> z + x = ';
+    sum.forEach(function(v, i) {
+      html += (i > 0 ? ', ' : '') + fmt(z[i]) + '+' + fmt(x[i]) + '=' + fmt(v);
+    });
+    html += '<br><strong>z + x = ' + fmtVec(sum) + '</strong></div>';
+
+    html += '<div class="calc-step"><strong>Step 4:</strong> Mean μ = (' + sum.map(function(v) { return fmt(v); }).join(' + ') + ') / ' + CALC_D;
+    html += ' = ' + fmt(sum.reduce(function(a, b) { return a + b; }, 0)) + ' / ' + CALC_D + ' = <strong>' + fmt(ln.mu) + '</strong></div>';
+
+    html += '<div class="calc-step"><strong>Step 5:</strong> Variance σ² = (';
+    sum.forEach(function(v, i) {
+      var diff = v - ln.mu;
+      html += (i > 0 ? ' + ' : '') + '(' + fmt(v) + '−' + fmt(ln.mu) + ')²=' + fmt(Math.pow(diff, 2), 4);
+    });
+    html += ') / ' + CALC_D + ' = <strong>' + fmt(ln.variance, 4) + '</strong></div>';
+
+    html += '<div class="calc-step"><strong>Step 6:</strong> √(σ² + ε) = √(' + fmt(ln.variance, 4) + ' + ' + CALC_EPS + ') = √(' + fmt(ln.variance + CALC_EPS, 6) + ') = <strong>' + fmt(ln.std, 4) + '</strong></div>';
+
+    html += '<div class="calc-step"><strong>Step 7:</strong> LayerNorm = (z+x − μ) / std<br>';
+    ln.normalized.forEach(function(v, i) {
+      html += 'dim ' + i + ': (' + fmt(sum[i]) + ' − ' + fmt(ln.mu) + ') / ' + fmt(ln.std, 4) + ' = ' + fmt(sum[i] - ln.mu, 4) + ' / ' + fmt(ln.std, 4) + ' = <strong>' + fmt(v) + '</strong><br>';
+    });
+    html += '<br><strong>LayerNorm output = ' + fmtVec(ln.normalized) + '</strong></div>';
+    return html;
+  }
+
+  function buildFFNCalcSection() {
+    var html = '<div class="formula-block"><h4>Worked Example: Feed-Forward Network (d=4 → hidden=6 → d=4)</h4>';
+    html += '<p style="font-size:0.85rem;color:var(--text-muted);">FFN(x) = ReLU(x · W<sub>1</sub> + b<sub>1</sub>) · W<sub>2</sub> + b<sub>2</sub></p></div>';
+
+    html += '<div class="calc-step"><strong>Input:</strong> x = ' + fmtVec(FFN_INPUT) + '</div>';
+    html += '<div class="calc-step"><strong>W<sub>1</sub> (4×6):</strong><br><pre style="margin:0.5rem 0;">' + fmtMatrix(W1_FFN) + '</pre>';
+    html += '<strong>b<sub>1</sub>:</strong> ' + fmtVec(B1_FFN) + '</div>';
+
+    html += '<div class="calc-section-title">Step 1: h_pre = x · W<sub>1</sub> + b<sub>1</sub>, then h = ReLU(h_pre)</div>';
+    W1_FFN[0].forEach(function(_, col) {
+      var pre = FFN_INPUT.reduce(function(s, xv, ri) { return s + xv * W1_FFN[ri][col]; }, 0) + B1_FFN[col];
+      var terms = FFN_INPUT.map(function(xv, ri) { return fmt(xv) + '×' + fmt(W1_FFN[ri][col]); });
+      var prods = FFN_INPUT.map(function(xv, ri) { return xv * W1_FFN[ri][col]; });
+      html += '<div class="calc-step">h_pre[' + col + '] = ' + terms.join(' + ') + ' + ' + fmt(B1_FFN[col]) + ' = ' + prods.map(function(p) { return fmt(p); }).join(' + ') + ' + ' + fmt(B1_FFN[col]) + ' = ' + fmt(pre) + '<br>';
+      html += 'h[' + col + '] = ReLU(' + fmt(pre) + ') = <strong>' + fmt(FFN_H[col]) + '</strong></div>';
+    });
+    html += '<div class="calc-step calc-highlight"><strong>Hidden h = ' + fmtVec(FFN_H) + '</strong></div>';
+
+    html += '<div class="calc-step"><strong>W<sub>2</sub> (6×4):</strong><br><pre style="margin:0.5rem 0;">' + fmtMatrix(W2_FFN) + '</pre>';
+    html += '<strong>b<sub>2</sub>:</strong> ' + fmtVec(B2_FFN) + '</div>';
+
+    html += '<div class="calc-section-title">Step 2: output = h · W<sub>2</sub> + b<sub>2</sub></div>';
+    W2_FFN[0].forEach(function(_, col) {
+      var pre = FFN_H.reduce(function(s, hv, ri) { return s + hv * W2_FFN[ri][col]; }, 0) + B2_FFN[col];
+      var terms = FFN_H.map(function(hv, ri) { return fmt(hv) + '×' + fmt(W2_FFN[ri][col]); });
+      var prods = FFN_H.map(function(hv, ri) { return hv * W2_FFN[ri][col]; });
+      html += '<div class="calc-step">out[' + col + '] = ' + terms.join(' + ') + ' + ' + fmt(B2_FFN[col]) + ' = ' + prods.map(function(p) { return fmt(p); }).join(' + ') + ' + ' + fmt(B2_FFN[col]) + ' = <strong>' + fmt(FFN_OUT[col]) + '</strong></div>';
+    });
+    html += '<div class="calc-step calc-highlight"><strong>FFN output = ' + fmtVec(FFN_OUT) + '</strong></div>';
+    return html;
+  }
+
+  // Attention scores (post-softmax, normalized for display)
+  // Patterns: data↔science, machine↔learning, "and" bridges both phrases
+  const RAW_ATTN = [
+    [0.82, 0.12, 0.02, 0.01, 0.01, 0.01, 0.01],  // i → like
+    [0.14, 0.52, 0.16, 0.10, 0.04, 0.02, 0.02],  // like → data/science
+    [0.02, 0.07, 0.38, 0.43, 0.05, 0.03, 0.02],  // data → science
+    [0.01, 0.05, 0.48, 0.36, 0.05, 0.03, 0.02],  // science → data
+    [0.03, 0.05, 0.18, 0.14, 0.12, 0.26, 0.22],  // and → both phrases
+    [0.01, 0.02, 0.03, 0.02, 0.05, 0.32, 0.55],  // machine → learning
+    [0.01, 0.02, 0.03, 0.03, 0.05, 0.54, 0.32],  // learning → machine
+  ];
+
+  function attnColor(score) {
+    // Warm amber gradient tuned for white background; dark text on light cells
+    const r = Math.round(255 - score * 120);
+    const g = Math.round(248 - score * 100);
+    const b = Math.round(235 - score * 180);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function attnTextColor(score) {
+    return score > 0.35 ? '#ffffff' : '#334155';
+  }
+
+  const NEXT_TOKEN_PROBS = [
+    { token: '.', prob: 0.38 },
+    { token: 'because', prob: 0.14 },
+    { token: 'models', prob: 0.18 },
+    { token: '!', prob: 0.08 },
+    { token: 'in', prob: 0.12 },
+    { token: 'for', prob: 0.10 },
+  ].sort((a, b) => b.prob - a.prob);
+
+  const PHASES = [
+    { id: 'overview', title: 'Overview', badge: 'overview', badgeText: 'Intro' },
+    { id: 'input', title: 'Input Sentence', badge: 'overview', badgeText: 'Input' },
+    { id: 'tokenize', title: 'Tokenization', badge: 'embed', badgeText: 'Tokens' },
+    { id: 'embedding', title: 'Token Embeddings', badge: 'embed', badgeText: 'Embed' },
+    { id: 'positional', title: 'Positional Encoding', badge: 'pos', badgeText: 'Position' },
+    { id: 'encoder-intro', title: 'Encoder Block', badge: 'attn', badgeText: 'Encoder' },
+    { id: 'qkv', title: 'Q, K, V Projection', badge: 'attn', badgeText: 'QKV' },
+    { id: 'attention-scores', title: 'Attention Scores', badge: 'attn', badgeText: 'Scores' },
+    { id: 'weighted-sum', title: 'Weighted Sum', badge: 'attn', badgeText: 'Blend' },
+    { id: 'add-norm-1', title: 'Add & Norm (Post-Attention)', badge: 'norm', badgeText: 'Norm' },
+    { id: 'ffn', title: 'Feed-Forward Network', badge: 'ffn', badgeText: 'FFN' },
+    { id: 'add-norm-2', title: 'Add & Norm (Post-FFN)', badge: 'norm', badgeText: 'Norm' },
+    { id: 'decoder', title: 'Encoder vs Decoder', badge: 'decoder', badgeText: 'Decoder' },
+    { id: 'output', title: 'Output & Softmax', badge: 'output', badgeText: 'Output' },
+    { id: 'full-arch', title: 'Full Architecture', badge: 'overview', badgeText: 'Summary' },
+    { id: 'complete', title: 'Journey Complete', badge: 'overview', badgeText: 'Done' },
+  ];
+
+  let currentPhase = 0;
+  let isPlaying = false;
+  let playTimer = null;
+  let animStep = 0;
+
+  const els = {
+    eduContent: document.getElementById('eduContent'),
+    progressFill: document.getElementById('progressFill'),
+    phaseNum: document.getElementById('phaseNum'),
+    phaseTotal: document.getElementById('phaseTotal'),
+    phaseTitle: document.getElementById('phaseTitle'),
+    phaseList: document.getElementById('phaseList'),
+    btnPrev: document.getElementById('btnPrev'),
+    btnPlay: document.getElementById('btnPlay'),
+    btnNext: document.getElementById('btnNext'),
+    btnReset: document.getElementById('btnReset'),
+    speedRange: document.getElementById('speedRange'),
+    speedLabel: document.getElementById('speedLabel'),
+  };
+
+  els.phaseTotal.textContent = PHASES.length;
+
+  function getSpeedMs() {
+    const v = parseInt(els.speedRange.value, 10);
+  const map = { 1: 4000, 2: 3000, 3: 2000, 4: 1200, 5: 800 };
+  const labels = { 1: 'Slow', 2: 'Relaxed', 3: 'Normal', 4: 'Fast', 5: 'Very Fast' };
+    els.speedLabel.textContent = labels[v];
+    return map[v];
+  }
+
+  function barHeight(val) {
+    return Math.max(4, val * 28);
+  }
+
+  function barColor(val, hue) {
+    const lightness = 55 + val * 25;
+    return `hsl(${hue}, 65%, ${lightness}%)`;
+  }
+
+  function buildTokenRow(highlightClass, visibleCount) {
+    return `<div class="tokens-row">${TOKENS.map((t, i) =>
+      `<div class="token ${i < visibleCount ? 'visible' : ''} ${highlightClass || ''}" data-idx="${i}">${t}</div>`
+    ).join('')}</div>`;
+  }
+
+  function buildEmbedGrid(vectors, label, hue, visibleCount) {
+    return `<div class="embed-grid">${vectors.map((vec, i) =>
+      `<div class="embed-row ${i < visibleCount ? 'visible' : ''}">
+        <span class="embed-label">${TOKENS[i]}</span>
+        <div class="vector-bars">${vec.map((v, j) =>
+          `<div class="vector-bar ${i < visibleCount ? 'filled' : ''}" style="height:${barHeight(v)}px;background:${barColor(v, hue)}" title="${v.toFixed(2)}"></div>`
+        ).join('')}</div>
+      </div>`
+    ).join('')}</div>`;
+  }
+
+  function buildHeatmap(visibleRows) {
+    let html = `<div class="heatmap-wrap"><div class="heatmap">
+      <div class="heatmap-header"><span></span>${TOKENS.map(t => `<span>${t}</span>`).join('')}</div>`;
+    RAW_ATTN.forEach((row, ri) => {
+      html += `<div class="heatmap-row ${ri < visibleRows ? 'visible' : ''}">
+        <span class="heatmap-row-label">${TOKENS[ri]}</span>
+        ${row.map((score, ci) =>
+          `<div class="heatmap-cell ${ri < visibleRows ? 'pop' : ''}" style="background:${attnColor(score)};color:${attnTextColor(score)}" title="${TOKENS[ri]} → ${TOKENS[ci]}: ${score.toFixed(2)}">${score.toFixed(2)}</div>`
+        ).join('')}
+      </div>`;
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  function buildEncoderStack(activeLayer) {
+    const layers = [
+      { name: 'Input Embeddings + Pos Encoding', cls: '' },
+      { name: 'Multi-Head Self-Attention', cls: 'attn-active' },
+      { name: 'Add & Norm', cls: 'norm-active' },
+      { name: 'Feed-Forward Network', cls: 'ffn-active' },
+      { name: 'Add & Norm', cls: 'norm-active' },
+      { name: 'Output Representations', cls: '' },
+    ];
+    return `<div class="encoder-stack">${layers.map((l, i) =>
+      `<div class="encoder-layer ${i === activeLayer ? 'active ' + l.cls : ''} viz-component ${i === activeLayer ? 'active' : ''}">${l.name}</div>`
+    ).join('')}</div>`;
+  }
+
+  function buildQKVViz(step) {
+    const showQ = step >= 1;
+    const showK = step >= 2;
+    const showV = step >= 3;
+    const showArrows = step >= 1;
+    return `<div class="qkv-viz">
+      <div class="matrix-box q ${showQ ? 'visible' : ''}">
+        <div class="label">Query (Q)</div>
+        <div class="mini-matrix">${Array(16).fill(0).map((_, i) =>
+          `<div class="mini-cell ${showQ && i < 8 ? 'active' : ''}">${showQ ? (i % 4) : ''}</div>`
+        ).join('')}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem;">"What am I looking for?"</div>
+      </div>
+      <div class="arrow-col">
+        <span class="arrow ${showArrows ? 'visible' : ''}">→</span>
+        <span class="arrow ${showK ? 'visible' : ''}">→</span>
+        <span class="arrow ${showV ? 'visible' : ''}">→</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <div class="matrix-box k ${showK ? 'visible' : ''}">
+          <div class="label">Key (K)</div>
+          <div class="mini-matrix">${Array(16).fill(0).map((_, i) =>
+            `<div class="mini-cell ${showK && i < 8 ? 'active' : ''}">${showK ? (i % 4) : ''}</div>`
+          ).join('')}</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem;">"What do I contain?"</div>
+        </div>
+        <div class="matrix-box v ${showV ? 'visible' : ''}">
+          <div class="label">Value (V)</div>
+          <div class="mini-matrix">${Array(16).fill(0).map((_, i) =>
+            `<div class="mini-cell ${showV && i < 8 ? 'active' : ''}">${showV ? (i % 4) : ''}</div>`
+          ).join('')}</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem;">"What info do I carry?"</div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">
+      Input vectors are linearly projected into three spaces via learned weight matrices W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>
+    </p>`;
+  }
+
+  function buildPosAddViz(step) {
+    const showEmbed = step >= 1;
+    const showPos = step >= 2;
+    const showOp = step >= 2;
+    const showResult = step >= 3;
+    return `<div class="pos-add-viz">
+      <div class="pos-block embed-block ${showEmbed ? 'visible' : ''}">Token Embedding<br><small>semantic meaning</small></div>
+      <span class="operator ${showOp ? 'visible' : ''}">+</span>
+      <div class="pos-block pos-enc-block ${showPos ? 'visible' : ''}">Positional Encoding<br><small>word position</small></div>
+      <span class="operator ${showResult ? 'visible' : ''}">=</span>
+      <div class="pos-block result-block ${showResult ? 'visible' : ''}">Combined Input<br><small>ready for attention</small></div>
+    </div>
+    ${showResult ? buildEmbedGrid(COMBINED, 'combined', 200, TOKENS.length) : ''}`;
+  }
+
+  function buildFFNViz(step) {
+    const showInput = step >= 1;
+    const showExpand = step >= 2;
+    const showContract = step >= 3;
+    return `<div class="ffn-viz">
+      <div class="ffn-layer ${showInput ? 'visible' : ''}">Input<br><small>d = 512</small></div>
+      <span class="ffn-arrow ${showExpand ? 'visible' : ''}">→</span>
+      <div class="ffn-layer ${showExpand ? 'visible expand' : ''}">Linear + ReLU<br><small>d = 2048</small></div>
+      <span class="ffn-arrow ${showContract ? 'visible' : ''}">→</span>
+      <div class="ffn-layer ${showContract ? 'visible contract' : ''}">Linear<br><small>d = 512</small></div>
+    </div>`;
+  }
+
+  function buildResidualViz(step) {
+    const showArrow = step >= 1;
+    const showMerge = step >= 2;
+    return `<div class="residual-viz" style="min-height:120px;">
+      <div class="skip-arrow ${showArrow ? 'visible' : ''}">
+        <svg width="40" height="120" viewBox="0 0 40 120">
+          <path d="M 20 110 Q 5 60 20 10" marker-end="url(#arrowhead)"/>
+          <defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#10b981"/></marker></defs>
+        </svg>
+      </div>
+      <div style="text-align:center;">
+        <div class="pos-block embed-block ${showMerge ? 'visible' : ''}" style="margin:0 auto 0.5rem;">Sublayer Output</div>
+        <span class="operator ${showMerge ? 'visible' : ''}">+</span>
+        <div class="pos-block result-block ${showMerge ? 'visible' : ''}" style="margin:0.5rem auto;">Residual (skip connection)</div>
+        <span class="operator ${showMerge ? 'visible' : ''}">→</span>
+        <div class="pos-block norm-active ${showMerge ? 'visible' : ''}" style="margin:0.5rem auto;background:rgba(16,185,129,0.2);border:1px solid var(--norm);color:var(--norm);">Layer Normalization</div>
+      </div>
+    </div>`;
+  }
+
+  function buildOutputViz(step) {
+    const visibleCount = Math.min(step, NEXT_TOKEN_PROBS.length);
+    return `<div class="output-viz">
+      <p style="text-align:center;font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">After processing "<strong style="color:var(--text)">${SENTENCE}</strong>", predict the next token:</p>
+      <div class="prob-bars">${NEXT_TOKEN_PROBS.map((p, i) =>
+        `<div class="prob-row ${i < visibleCount ? 'visible' : ''}">
+          <span class="prob-label">${p.token}</span>
+          <div class="prob-bar-wrap"><div class="prob-bar-fill" style="width:${i < visibleCount ? p.prob * 100 : 0}%"></div></div>
+          <span class="prob-value">${(p.prob * 100).toFixed(0)}%</span>
+        </div>`
+      ).join('')}</div>
+    </div>`;
+  }
+
+  function buildArchSVG(highlight) {
+    const hl = highlight || 'none';
+    return `<svg class="arch-svg" viewBox="0 0 520 380" xmlns="http://www.w3.org/2000/svg">
+      <rect class="block ${hl === 'input' ? 'glow' : hl !== 'none' && hl !== 'input' ? 'dim' : ''}" x="180" y="10" width="160" height="40" rx="6" fill="#ffffff" stroke="#0d9488" stroke-width="2"/>
+      <text x="260" y="35" text-anchor="middle" fill="#0d9488" font-size="11" font-family="Segoe UI,sans-serif">Token + Position Embed</text>
+      <line x1="260" y1="50" x2="260" y2="70" stroke="#cbd5e1" stroke-width="2"/>
+      <rect class="block ${hl === 'attn' ? 'glow' : hl !== 'none' && hl !== 'attn' ? 'dim' : ''}" x="160" y="70" width="200" height="45" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="2"/>
+      <text x="260" y="97" text-anchor="middle" fill="#d97706" font-size="11" font-family="Segoe UI,sans-serif">Multi-Head Attention</text>
+      <line x1="260" y1="115" x2="260" y2="135" stroke="#cbd5e1" stroke-width="2"/>
+      <rect class="block ${hl === 'norm' ? 'glow' : ''}" x="180" y="135" width="160" height="30" rx="6" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+      <text x="260" y="155" text-anchor="middle" fill="#059669" font-size="10" font-family="Segoe UI,sans-serif">Add & Norm</text>
+      <line x1="260" y1="165" x2="260" y2="185" stroke="#cbd5e1" stroke-width="2"/>
+      <rect class="block ${hl === 'ffn' ? 'glow' : hl !== 'none' && hl !== 'ffn' ? 'dim' : ''}" x="160" y="185" width="200" height="45" rx="6" fill="#ffffff" stroke="#db2777" stroke-width="2"/>
+      <text x="260" y="212" text-anchor="middle" fill="#db2777" font-size="11" font-family="Segoe UI,sans-serif">Feed-Forward Network</text>
+      <line x1="260" y1="230" x2="260" y2="250" stroke="#cbd5e1" stroke-width="2"/>
+      <rect class="block ${hl === 'norm2' ? 'glow' : ''}" x="180" y="250" width="160" height="30" rx="6" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+      <text x="260" y="270" text-anchor="middle" fill="#059669" font-size="10" font-family="Segoe UI,sans-serif">Add & Norm</text>
+      <path d="M 120 97 Q 80 97 80 150 Q 80 250 120 270" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+      <path d="M 400 97 Q 440 97 440 150 Q 440 250 400 270" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+      <text x="55" y="180" fill="#059669" font-size="9" font-family="Segoe UI,sans-serif" opacity="0.7">skip</text>
+      <line x1="260" y1="280" x2="260" y2="310" stroke="#cbd5e1" stroke-width="2"/>
+      <rect class="block ${hl === 'output' ? 'glow' : ''}" x="180" y="310" width="160" height="40" rx="6" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+      <text x="260" y="335" text-anchor="middle" fill="#dc2626" font-size="11" font-family="Segoe UI,sans-serif">Linear + Softmax</text>
+      <rect x="380" y="70" width="100" height="200" rx="6" fill="none" stroke="#4f46e5" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.5"/>
+      <text x="430" y="60" text-anchor="middle" fill="#4f46e5" font-size="10" font-family="Segoe UI,sans-serif">Encoder Block</text>
+    </svg>`;
+  }
+
+  function buildSineWaveSVG() {
+    let path = 'M 0 60';
+    for (let x = 0; x <= 480; x += 4) {
+      const pos = x / 40;
+      const y = 60 - Math.sin(pos) * 35;
+      path += ` L ${x} ${y.toFixed(1)}`;
+    }
+    return `<svg class="sine-wave-svg" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg">
+      <line x1="0" y1="60" x2="480" y2="60" stroke="#e2e8f0" stroke-width="1"/>
+      <path d="${path}" fill="none" stroke="#7c3aed" stroke-width="2"/>
+      <text x="10" y="15" fill="#64748b" font-size="10" font-family="Segoe UI,sans-serif">PE(pos, 2i) = sin(pos / 10000^(2i/d))</text>
+      ${TOKENS.map((t, i) => `<circle cx="${i * 68 + 34}" cy="${(60 - Math.sin(i / 40 * 1) * 35).toFixed(0)}" r="5" fill="#7c3aed"/><text x="${i * 68 + 34}" y="110" text-anchor="middle" fill="#64748b" font-size="9">${t}</text>`).join('')}
+    </svg>`;
+  }
+
+  function buildTokenIdTable(visibleCount) {
+    return `<table class="token-id-table">
+      <thead><tr><th>Token</th><th>ID</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>${TOKENS.map((t, i) => `<tr style="opacity:${i < visibleCount ? 1 : 0.3}">
+        <td>${t}</td><td>${TOKEN_IDS[i]}</td>
+        <td>${i === 0 ? 'pronoun' : i === 1 ? 'verb' : i === 4 ? 'conjunction' : 'noun/compound'}</td>
+        <td style="text-align:left;font-size:0.78rem;">${i === 2 ? 'Domain keyword — clusters near "science"' : i === 5 ? 'Subword: "machine" + "learning" often co-occur' : i === 6 ? 'Compound concept token' : 'Common vocabulary token'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function buildModelCompareTable() {
+    return `<table class="compare-table">
+      <thead><tr><th>Model</th><th>Architecture</th><th>Attention</th><th>Best For</th></tr></thead>
+      <tbody>
+        <tr><td><strong>BERT</strong></td><td>Encoder-only</td><td>Bidirectional (all tokens)</td><td>Classification, embeddings, NER</td></tr>
+        <tr><td><strong>GPT</strong></td><td>Decoder-only</td><td>Causal (past tokens only)</td><td>Text generation, chat, code</td></tr>
+        <tr><td><strong>T5</strong></td><td>Encoder-decoder</td><td>Both types</td><td>Translation, summarization</td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  function buildRNNCompareTable() {
+    return `<table class="compare-table">
+      <thead><tr><th>Property</th><th>RNN / LSTM</th><th>Transformer</th></tr></thead>
+      <tbody>
+        <tr><td>Processing</td><td>Sequential (one token at a time)</td><td>Parallel (all tokens at once)</td></tr>
+        <tr><td>Long-range deps</td><td>Hard — information decays over steps</td><td>Direct — any token attends to any token</td></tr>
+        <tr><td>Training speed</td><td>Slow on long sequences</td><td>Fast on GPUs (matrix ops)</td></tr>
+        <tr><td>Used in modern LLMs</td><td>Rarely</td><td>Standard (GPT, BERT, Claude, etc.)</td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  function getPhaseContent(phaseIdx, step) {
+    const phase = PHASES[phaseIdx];
+    const s = step || 0;
+
+    switch (phase.id) {
+      case 'overview':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-overview">${phase.badgeText}</span> What Are Transformers?</h2>
+            <p>Transformers are the neural network architecture behind modern language models like GPT, BERT, Claude, and Gemini. Introduced in the 2017 paper <em>"Attention Is All You Need"</em> by Vaswani et al. at Google, they revolutionized natural language processing by replacing sequential recurrence with <span class="tooltip-term" data-tip="Mechanism where each token attends to all other tokens in the sequence">self-attention</span>.</p>
+            <p>Before transformers, NLP relied on <span class="tooltip-term" data-tip="Recurrent Neural Networks — process tokens one at a time sequentially">RNNs</span> and LSTMs that read text left-to-right, one word at a time. This was slow (no parallelism) and struggled with long-range dependencies — connecting "learning" at the end of a sentence back to "data" at the beginning required information to survive many sequential steps.</p>
+            <p>Transformers changed everything. When you read "i like data science and machine learning," you don't process each word in isolation — you instantly connect "data" with "science" and "machine" with "learning." Transformers formalize this: every token can directly look at every other token and decide how much attention to pay.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Transformers power the AI tools data scientists use daily: code assistants, documentation search, automated report generation, and fine-tuned domain models. Understanding this architecture helps you choose models, interpret outputs, and debug prompt behavior.</div>
+            <div class="callout-insight"><strong>Key Insight</strong>Scale is what turned transformers from a research idea into GPT-4 and beyond. The original paper used 6 layers and 512 dimensions. GPT-3 has 96 layers and 12,288 dimensions — but the core mechanism (attention + FFN + residuals) remains identical.</div>
+            ${buildRNNCompareTable()}
+            <details class="learn-more"><summary>Learn More: From 2017 Paper to Modern LLMs</summary><div class="learn-body">
+              <p><strong>2017:</strong> "Attention Is All You Need" — original encoder-decoder for translation.<br>
+              <strong>2018:</strong> BERT (encoder-only) dominates understanding tasks.<br>
+              <strong>2019–2020:</strong> GPT-2/3 (decoder-only) show emergent generation abilities.<br>
+              <strong>2022–today:</strong> ChatGPT, Claude, Llama — decoder-only transformers at massive scale, used for coding, analysis, and ML workflow automation.</p>
+            </div></details>
+            <div class="viz-panel">${buildArchSVG('none')}</div>
+          </section>`;
+
+      case 'input':
+        const wordCount = Math.min(s + 1, SENTENCE.split(' ').length);
+        const words = SENTENCE.split(' ');
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-overview">${phase.badgeText}</span> Our Example Sentence</h2>
+            <p>We'll trace exactly how a transformer processes a concrete sentence end-to-end. Using a real example from the data science domain makes abstract matrix operations tangible — you'll see how "data" and "science" form one conceptual unit, and "machine" and "learning" form another.</p>
+            <p>Our sentence has <strong>7 tokens</strong> — short enough to visualize every attention score in a 7×7 heatmap, yet rich enough to show compound phrases, conjunctions, and cross-phrase relationships.</p>
+            <div class="sentence-display">${words.map((w, i) =>
+              `<span class="word ${i < wordCount ? 'visible' : ''}">${w}</span>`
+            ).join('')}</div>
+            <div class="callout-insight"><strong>Key Insight</strong>The transformer never sees this as plain text. It must convert the sentence into numbers — token IDs, embedding vectors, attention matrices — before any computation begins. That conversion starts with tokenization in the next phase.</div>
+            <p>Notice the two natural phrase groups: <em>"data science"</em> and <em>"machine learning"</em>. Attention layers will learn to connect tokens within each group, while "and" bridges them. This mirrors how you'd parse the sentence as a human reader.</p>
+            <div class="callout-warning"><strong>Common Misconception</strong>Models don't understand English the way we do. They manipulate high-dimensional vectors. The sentence is just the starting point for a series of matrix multiplications.</div>
+          </section>`;
+
+      case 'tokenize':
+        const tokenCount = Math.min(s + 1, TOKENS.length);
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-embed">${phase.badgeText}</span> Tokenization</h2>
+            <p>Before a model can work with text, it must break the sentence into <span class="tooltip-term" data-tip="Smallest units the model processes — often words or subword pieces">tokens</span>. Raw strings can't be multiplied by weight matrices — only integers and floats can.</p>
+            <p>Modern models use <strong>subword tokenization</strong> (BPE, WordPiece, or SentencePiece) rather than simple word splitting. A vocabulary of ~30,000–100,000 subword pieces handles rare words gracefully: "learning" might be one token, while an obscure term gets split into familiar pieces.</p>
+            <p>For our example, each word maps cleanly to one token — all seven are common in ML training corpora. The tokenizer assigns each token a unique integer ID from its vocabulary lookup table.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Tokenization affects everything downstream. Prompt engineering tricks (extra spaces, punctuation) work because they change token boundaries. Data scientists fine-tuning models must understand how their domain terms get tokenized.</div>
+            <div class="viz-panel">
+              ${buildTokenRow('', tokenCount)}
+              ${tokenCount >= TOKENS.length ? buildTokenIdTable(TOKENS.length) : ''}
+            </div>
+            <div class="callout-math"><strong>BPE Intuition</strong>Byte Pair Encoding iteratively merges the most frequent character pairs. "machine" + "learning" frequently co-occur in ML text, so they often remain separate tokens that attention later binds together — unlike rare compound words that get split.</div>
+            <details class="learn-more"><summary>Learn More: Word-Level vs Subword Tokenization</summary><div class="learn-body">
+              <p><strong>Word-level:</strong> Simple but huge vocabularies, unknown words become UNK tokens.<br>
+              <strong>Character-level:</strong> Tiny vocabulary but very long sequences.<br>
+              <strong>Subword (BPE):</strong> Best of both — manageable vocab size, handles rare/domain terms. GPT and BERT both use subword tokenization.</p>
+            </div></details>
+          </section>`;
+
+      case 'embedding':
+        const embedCount = Math.min(s + 1, TOKENS.length);
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-embed">${phase.badgeText}</span> Token Embeddings</h2>
+            <p>As we saw in tokenization, each token ID is an integer. The embedding layer maps each ID to a dense <span class="tooltip-term" data-tip="A list of numbers representing meaning in high-dimensional space">embedding vector</span> — typically 512 dimensions (original transformer), 768 (BERT-base), or 4096+ in modern LLMs.</p>
+            <p>Imagine a vast semantic space where every word is a point. Similar concepts cluster together: "data" and "science" sit near each other; "machine" and "learning" form another cluster; unrelated words like "i" and "learning" are far apart. These positions are <em>learned</em> during training, not hand-coded.</p>
+            <p>Unlike one-hot encoding (a sparse vector with a single 1 and thousands of 0s), embeddings are dense and continuous. A one-hot vector for "data" tells you nothing about "science"; an embedding captures their semantic relationship.</p>
+            <div class="callout-insight"><strong>Key Insight</strong>The embedding layer is essentially a lookup table: a matrix of shape [vocab_size × d_model]. Token ID 2958 ("data") retrieves row 2958 — a 512-dimensional vector learned from billions of training examples.</div>
+            <div class="viz-panel dimmed">
+              ${buildTokenRow('highlight-embed', TOKENS.length)}
+              ${buildEmbedGrid(EMBEDDINGS, 'embed', 175, embedCount)}
+              <p style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-top:0.75rem;">Each bar = one dimension of the ${EMBED_DIM}-dim vector (simplified; real models use ${FULL_MODEL_DIM}+ dims)</p>
+            </div>
+            <div class="callout-warning"><strong>Common Misconception</strong>Embeddings don't contain "definitions." They're coordinates in a space where proximity = semantic similarity, learned purely from co-occurrence patterns in training data.</div>
+          </section>`;
+
+      case 'positional':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-pos">${phase.badgeText}</span> Positional Encoding</h2>
+            <p>Embeddings capture <em>what</em> a word is, but not <em>where</em> it sits. Without position information, "i like data" and "data like i" would produce identical inputs — the model would be blind to word order.</p>
+            <p>Transformers add <span class="tooltip-term" data-tip="Sinusoidal or learned vectors encoding each position in the sequence">positional encodings</span> to each embedding vector. The original paper used sine and cosine functions at different frequencies — a clever trick that lets the model learn relative positions and extrapolate to longer sequences.</p>
+            <div class="formula">PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>) &nbsp;&nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)</div>
+            <p>For our sentence, position 0 ("i") gets one encoding pattern, position 2 ("data") another. After addition, each token's vector encodes both its meaning and its place in the sequence.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Order is critical in ML sentences: "predict the label" vs "label the predict" mean entirely different things. Positional encoding ensures the model respects syntax and phrase structure.</div>
+            ${buildSineWaveSVG()}
+            <div class="viz-panel">
+              ${buildPosAddViz(s)}
+            </div>
+            <div class="callout-insight"><strong>Key Insight</strong>Modern models (GPT, Llama) often use <em>learned</em> positional embeddings or RoPE (Rotary Position Embedding) instead of sinusoidal — but the principle is the same: inject position information before attention.</div>
+            <details class="learn-more"><summary>Learn More: Why Sine and Cosine?</summary><div class="learn-body">
+              <p>Each dimension oscillates at a different frequency. Low-frequency dimensions capture coarse position (beginning vs end of sentence); high-frequency dimensions capture fine-grained relative distances. The model can compute relative positions via linear combinations of encodings at different positions.</p>
+            </div></details>
+            ${buildPECalcSection()}
+          </section>`;
+
+      case 'encoder-intro':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-attn">${phase.badgeText}</span> The Encoder Block</h2>
+            <p>With tokenized, embedded, and position-encoded inputs ready, we enter the encoder — the core processing unit. Each encoder layer has two sublayers: <strong>multi-head self-attention</strong> (tokens communicate with each other) and a <strong>feed-forward network</strong> (each token processed independently).</p>
+            <p>Both sublayers use <span class="tooltip-term" data-tip="Output is added back to input before normalization — helps gradient flow">residual connections</span> followed by layer normalization. Production models stack 6 layers (original), 12 (BERT-base), or 80+ (large LLMs) — each layer refines representations further.</p>
+            <p>For our 7-token sentence, the input is a matrix of shape <strong>7 × 512</strong> — seven token vectors, each 512-dimensional. Every subsequent operation is matrix math on this shape.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>The encoder block is repeated N times. Early layers often capture syntax ("data" is a noun); deeper layers capture semantics ("data science" is a field of study). This hierarchical feature learning mirrors CNN layers in computer vision.</div>
+            <div class="viz-panel dimmed">
+              ${buildEncoderStack(s >= 1 ? 1 : 0)}
+              ${buildArchSVG('attn')}
+            </div>
+            <div class="callout-insight"><strong>Key Insight</strong>Self-attention has no built-in order — that's why positional encoding (previous phase) is essential. Together, they give each token both "what am I?" and "where am I?" before communication begins.</div>
+          </section>`;
+
+      case 'qkv':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-attn">${phase.badgeText}</span> Query, Key, and Value</h2>
+            <p>Self-attention begins by projecting each of our 7 input vectors into three different representations via learned weight matrices. Think of it like a library search system applied to our sentence:</p>
+            <p><strong>Query (Q):</strong> "What am I looking for?" — each token's question.<br>
+            <strong>Key (K):</strong> "What information do I contain?" — each token's searchable label.<br>
+            <strong>Value (V):</strong> "Here's my actual content" — the information to share if matched.</p>
+            <div class="formula">Q = X · W<sub>Q</sub> &nbsp; K = X · W<sub>K</sub> &nbsp; V = X · W<sub>V</sub> &nbsp; (X is 7×512, each W is 512×512)</div>
+            <p>With <strong>${NUM_HEADS} attention heads</strong>, each head uses d<sub>k</sub> = ${HEAD_DIM} dimensions (512 ÷ 8 = 64). Each head learns different relationship types — one head might focus on syntactic links, another on semantic pairs like "data↔science".</p>
+            <div class="callout-math"><strong>Mini Worked Example</strong>Below: full Q/K/V matrix multiplication for "data", "science", and "learning" with d<sub>model</sub> = 4. Every dot product is expanded term-by-term so you can verify by hand.</div>
+            <div class="viz-panel">
+              ${buildQKVViz(s)}
+            </div>
+            <div class="callout-warning"><strong>Common Misconception</strong>Q, K, V aren't "stored facts" about words. They're learned projections — the same input vector gets transformed three different ways to enable the search-and-retrieve mechanism.</div>
+            ${buildQKVCalcSection()}
+          </section>`;
+
+      case 'attention-scores':
+        const heatRows = Math.min(s + 1, TOKENS.length);
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-attn">${phase.badgeText}</span> Computing Attention Scores</h2>
+            <p>Attention scores measure how much each token should focus on every other token. We compute Q × K<sup>T</sup> — dot products between all query-key pairs — producing a <strong>7×7 matrix</strong> for our sentence.</p>
+            <p>Raw dot products can be very large, causing softmax to saturate (giving near-0 or near-1 weights). Dividing by √d<sub>k</sub> (= √64 = 8) keeps values in a stable range before softmax.</p>
+            <div class="formula">scores = softmax(Q · K<sup>T</sup> / √d<sub>k</sub>) &nbsp;→&nbsp; each row sums to 1.0</div>
+            <p><strong>Reading our heatmap:</strong> Warm/dark cells = strong attention. Notice the patterns:</p>
+            <ul style="color:var(--text-muted);font-size:0.88rem;margin:0.75rem 0 0.75rem 1.25rem;">
+              <li><strong>data → science</strong> (0.43): compound concept linking</li>
+              <li><strong>machine → learning</strong> (0.55): another compound pair</li>
+              <li><strong>and</strong> row: distributes attention to both phrase groups</li>
+              <li><strong>like → data/science</strong>: verb connecting to its object domain</li>
+            </ul>
+            <div class="callout-insight"><strong>Key Insight</strong>In decoder models (GPT), a <em>causal mask</em> zeroes out future tokens — "data" can't attend to "science" if it hasn't been generated yet. Our encoder heatmap shows full bidirectional attention.</div>
+            <div class="viz-panel">
+              ${buildHeatmap(heatRows)}
+              <div class="formula" style="margin-top:1rem;">Step-by-step for row "data": raw scores → divide by √64 → softmax → [0.02, 0.07, 0.38, 0.43, 0.05, 0.03, 0.02]</div>
+            </div>
+            <div class="callout-warning"><strong>Common Misconception</strong>Attention weights aren't "explainability" in a causal sense — they show correlation patterns learned during training, not necessarily human-readable reasoning.</div>
+            ${buildAttentionCalcSection()}
+          </section>`;
+
+      case 'weighted-sum':
+        const blendStep = Math.min(s + 1, TOKENS.length);
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-attn">${phase.badgeText}</span> Weighted Sum of Values</h2>
+            <p>Each token's output is a weighted blend of all value vectors, using attention scores as weights. As we saw in the attention scores phase, if "learning" pays 54% attention to "machine" and 32% to itself:</p>
+            <div class="formula">output<sub>learning</sub> = 0.01·V<sub>i</sub> + 0.02·V<sub>like</sub> + ... + 0.54·V<sub>machine</sub> + 0.32·V<sub>learning</sub></div>
+            <p>This is the magic of self-attention: each token's representation now incorporates contextual information from the entire sentence. "Learning" in isolation becomes "learning (in the context of machine learning, within a sentence about data science)."</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Without this step, each token would only know its own embedding. Weighted sum creates <em>contextualized</em> representations — the foundation for every NLP task from sentiment analysis to code generation.</div>
+            <div class="viz-panel">
+              ${buildHeatmap(TOKENS.length)}
+              <div style="text-align:center;margin-top:1rem;">
+                <div class="pos-block result-block visible" style="margin:0 auto;">Output = Attention Scores × V</div>
+              </div>
+              ${buildEmbedGrid(EMBEDDINGS.map((e, i) => e.map((v, j) => Math.round(v * (0.5 + RAW_ATTN[i][j]) * 100) / 100)), 'contextual', 45, blendStep)}
+            </div>
+            <div class="callout-insight"><strong>Key Insight</strong>After attention, "machine" and "learning" vectors have moved closer in representation space — the model has fused them into a compound concept, just as a reader would.</div>
+            ${buildWeightedSumCalcSection()}
+          </section>`;
+
+      case 'add-norm-1':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-norm">${phase.badgeText}</span> Residual Connection + Layer Norm</h2>
+            <p>After attention produces its weighted-sum output, we don't replace the original input — we <em>add</em> the attention output back to it (residual/skip connection), then apply layer normalization.</p>
+            <div class="formula">output = LayerNorm(x + Attention(x))</div>
+            <p>Residual connections solve a critical training problem: in deep networks (12+ layers), gradients vanish as they backpropagate through many layers. Skip connections create shortcuts so gradients flow directly, making deep transformers trainable.</p>
+            <div class="callout-math"><strong>Layer Norm Formula</strong>LayerNorm(x) = γ · (x − μ) / σ + β &nbsp; where μ, σ are mean and std across features, γ and β are learned scale/shift parameters.</div>
+            <div class="callout-info"><strong>Why It Matters</strong>Without residuals, GPT-3's 96 layers would be impossible to train. Without layer norm, activations would drift to extreme values. Together, they stabilize training of billion-parameter models.</div>
+            <div class="viz-panel">
+              ${buildResidualViz(s)}
+              ${buildEncoderStack(2)}
+            </div>
+            <div class="callout-insight"><strong>Key Insight</strong>The residual preserves the original token identity while attention adds context. "Learning" still knows it's "learning" — but now enriched with "machine" context from the attention step.</div>
+            ${buildLayerNormCalcSection()}
+          </section>`;
+
+      case 'ffn':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-ffn">${phase.badgeText}</span> Feed-Forward Network</h2>
+            <p>After attention gathers context from neighbors, the FFN lets each token "think" about what it gathered — independently, with no cross-token interaction. It's a two-layer MLP applied identically to each of our 7 token vectors:</p>
+            <div class="formula">FFN(x) = ReLU(x · W<sub>1</sub> + b<sub>1</sub>) · W<sub>2</sub> + b<sub>2</sub> &nbsp; (512 → 2048 → 512)</div>
+            <p>The expand-then-contract pattern (512 → 2048 → 512) gives the network more capacity to compute complex transformations. ReLU introduces non-linearity — without it, stacking linear layers would be equivalent to a single linear layer.</p>
+            <p><strong>Parameter count intuition:</strong> One FFN layer has W<sub>1</sub> (512×2048) + W<sub>2</sub> (2048×512) ≈ 2M parameters. With 6 encoder layers, FFNs alone contribute ~12M parameters — often more than attention!</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Attention = "gather information from context." FFN = "process and transform what you gathered." Analogy: attention is asking colleagues for input; FFN is thinking through their answers independently.</div>
+            <div class="viz-panel">
+              ${buildFFNViz(s)}
+              ${buildEncoderStack(3)}
+            </div>
+            <details class="learn-more"><summary>Learn More: Why Expand to 4× Dimensions?</summary><div class="learn-body">
+              <p>The 4× expansion (512→2048) is an empirical sweet spot. Larger inner dimensions give more expressiveness but increase parameters quadratically. GPT-3 uses 4× ratio; some models use 8× or SwiGLU activations instead of ReLU for better performance.</p>
+            </div></details>
+            ${buildFFNCalcSection()}
+          </section>`;
+
+      case 'add-norm-2':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-norm">${phase.badgeText}</span> Second Add & Norm</h2>
+            <p>The same residual + normalization pattern wraps the FFN output: LayerNorm(x + FFN(x)). This completes one full encoder layer — attention (gather context) → add & norm → FFN (process) → add & norm.</p>
+            <p>In a 6-layer encoder, this entire block repeats six times. Each layer builds increasingly abstract representations: layer 1 might capture local syntax; layer 6 might capture that the sentence expresses interest in ML/data science topics.</p>
+            <div class="callout-insight"><strong>Key Insight</strong>Pre-norm vs post-norm: the original paper applied norm <em>after</em> the residual add. Modern models (GPT-2+) often use pre-norm (norm before sublayer) for more stable training at scale.</div>
+            <div class="viz-panel">
+              ${buildResidualViz(s >= 1 ? 2 : 0)}
+              ${buildEncoderStack(4)}
+              ${buildArchSVG('norm2')}
+            </div>
+            <p style="color:var(--text-muted);font-size:0.88rem;">The output of this layer — enriched 7×512 representations — feeds into the next encoder layer (or the decoder/output head in full models).</p>
+          </section>`;
+
+      case 'decoder':
+        const showEnc = s >= 1;
+        const showDec = s >= 2;
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-decoder">${phase.badgeText}</span> Encoder vs Decoder</h2>
+            <p>The original 2017 transformer had both an encoder (reads input) and a decoder (generates output). Translation: encoder reads French, decoder writes English. But modern ML/NLP uses three distinct variants:</p>
+            ${buildModelCompareTable()}
+            <p><strong>Decoder-only (GPT):</strong> Uses masked self-attention — each token only sees previous tokens. When generating after "i like data science and machine learning", the model predicts the next token using all prior context.</p>
+            <p><strong>Encoder-only (BERT):</strong> Bidirectional — every token sees all others. Great for classification ("is this sentence about ML?") but can't generate text left-to-right.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Choosing the right architecture for your data science task: use encoder models for embeddings/classification, decoder models for text generation/code completion, encoder-decoder for summarization.</div>
+            <div class="viz-panel">
+              <div class="compare-grid">
+                <div class="compare-card encoder ${showEnc ? 'visible' : ''}">
+                  <h4>Encoder (BERT-style)</h4>
+                  <p style="font-size:0.8rem;color:var(--text-muted);">Bidirectional attention — "data" sees both "like" and "science." Used for classification, embeddings, named entity recognition, semantic search over ML papers.</p>
+                </div>
+                <div class="compare-card decoder ${showDec ? 'visible' : ''}">
+                  <h4>Decoder (GPT-style)</h4>
+                  <p style="font-size:0.8rem;color:var(--text-muted);">Causal mask — "learning" sees "machine" but not future tokens. Used for text generation, chat, code completion, data analysis narration.</p>
+                </div>
+              </div>
+              ${buildArchSVG('none')}
+            </div>
+            <div class="callout-warning"><strong>Common Misconception</strong>ChatGPT isn't "an encoder and decoder working together." It's a decoder-only model — the prompt is the input context, and generation happens autoregressively token by token.</div>
+          </section>`;
+
+      case 'output':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-output">${phase.badgeText}</span> Output & Next-Token Prediction</h2>
+            <p>For language generation, the final hidden state of the last token ("learning") is projected to vocabulary size via a linear layer, then <span class="tooltip-term" data-tip="Converts logits to a probability distribution over all vocabulary tokens">softmax</span> produces probabilities for each possible next token.</p>
+            <div class="formula">P(token) = softmax(h<sub>last</sub> · W<sub>vocab</sub>) &nbsp;→&nbsp; ~50,000 probabilities</div>
+            <p>After our sentence "i like data science and machine learning", the model assigns highest probability to <strong>"."</strong> (38%) — a natural sentence ending. Other candidates like "models" (18%) or "because" (14%) could continue the thought differently.</p>
+            <p><strong>Generation controls:</strong> <em>Temperature</em> scales logits before softmax (low = deterministic, high = creative). <em>Top-k</em> restricts sampling to the k most likely tokens. <em>Top-p</em> (nucleus) samples from the smallest set whose cumulative probability exceeds p.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>This autoregressive loop — predict one token, append it, repeat — is how LLMs write code, analyze datasets, and generate reports. The entire transformer runs again for each new token.</div>
+            <div class="viz-panel">
+              ${buildOutputViz(s)}
+              ${buildArchSVG('output')}
+            </div>
+            <div class="callout-insight"><strong>Key Insight</strong>Training objective is simple: predict the next token. Given "i like data science and machine", the target is "learning." Scale this to trillions of tokens and the model learns grammar, facts, and reasoning patterns.</div>
+            <details class="learn-more"><summary>Learn More: Temperature & Sampling</summary><div class="learn-body">
+              <p>Temperature τ: logits are divided by τ before softmax. τ=0.1 → nearly greedy (always pick highest). τ=1.0 → standard. τ=2.0 → more random. Data scientists tuning LLM outputs adjust temperature based on whether they need precise code (low τ) or creative brainstorming (high τ).</p>
+            </div></details>
+          </section>`;
+
+      case 'full-arch':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-overview">${phase.badgeText}</span> The Full Picture</h2>
+            <p>You've now walked through every major component of a transformer encoder layer, tracing our sentence through each step. In production models, this stack is scaled dramatically:</p>
+            <table class="compare-table">
+              <thead><tr><th>Component</th><th>Our Demo</th><th>GPT-3</th><th>Modern LLMs</th></tr></thead>
+              <tbody>
+                <tr><td>Layers (N)</td><td>1 (animated)</td><td>96</td><td>32–128+</td></tr>
+                <tr><td>Dimensions (d)</td><td>8 (display)</td><td>12,288</td><td>4,096–16,384</td></tr>
+                <tr><td>Attention heads</td><td>8</td><td>96</td><td>32–128</td></tr>
+                <tr><td>Parameters</td><td>—</td><td>175B</td><td>7B–1T+</td></tr>
+                <tr><td>Training data</td><td>—</td><td>~300B tokens</td><td>Trillions of tokens</td></tr>
+              </tbody>
+            </table>
+            <p>But the core idea remains identical across all scales: <strong>tokens attend to tokens</strong>, context flows through residual pathways, feed-forward layers refine representations, and the model learns by predicting the next token.</p>
+            <div class="callout-info"><strong>Why It Matters</strong>Understanding this architecture — even at a high level — helps data scientists choose between models, design effective prompts, interpret attention patterns, and estimate compute costs for fine-tuning.</div>
+            <div class="callout-insight"><strong>Key Insight</strong>Training objective: maximize likelihood of next token. No explicit rules for grammar or logic — these emerge from scale. Our 7-token sentence required ~7² = 49 attention computations; a 128K context window requires ~16 billion per layer.</div>
+            <div class="viz-panel">
+              ${buildArchSVG('none')}
+              ${buildEncoderStack(-1)}
+            </div>
+          </section>`;
+
+      case 'complete':
+        return `
+          <section class="edu-section active">
+            <h2><span class="badge badge-overview">${phase.badgeText}</span> Journey Complete!</h2>
+            <p>You've traced "<strong>${SENTENCE}</strong>" through the entire transformer pipeline — from raw text through tokenization, embeddings, positional encoding, multi-head self-attention, feed-forward networks, and next-token prediction.</p>
+            <p>Along the way, you saw how "data" attends to "science" and "machine" attends to "learning" — the model learning the same phrase structure you recognize as a reader. You explored the math (softmax, layer norm, Q/K/V projections) and the engineering (residuals, multi-head attention, scaling laws).</p>
+            <div class="callout-insight"><strong>Key Insight</strong>Every ChatGPT response, every code completion, every embedding from BERT — all run through this same pipeline. The difference is scale: more layers, more data, more compute.</div>
+            <div class="viz-panel">
+              <div class="sentence-display">
+                ${SENTENCE.split(' ').map(w => `<span class="word visible">${w}</span>`).join('')}
+              </div>
+              ${buildArchSVG('none')}
+              <p style="text-align:center;margin-top:1rem;color:var(--norm);font-weight:600;">✓ All 16 phases explored</p>
+            </div>
+            <p style="color:var(--text-muted);">Use the controls to revisit any phase. Click sidebar phases to jump directly. Hover over highlighted terms for quick definitions. Expand "Learn More" sections for deeper dives.</p>
+          </section>`;
+
+      default:
+        return '';
+    }
+  }
+
+  function getMaxSteps(phaseIdx) {
+    const id = PHASES[phaseIdx].id;
+    const map = {
+      input: SENTENCE.split(' ').length,
+      tokenize: TOKENS.length,
+      embedding: TOKENS.length,
+      positional: 3,
+      'encoder-intro': 1,
+      qkv: 3,
+      'attention-scores': TOKENS.length,
+      'weighted-sum': TOKENS.length,
+      'add-norm-1': 2,
+      ffn: 3,
+      'add-norm-2': 2,
+      decoder: 2,
+      output: NEXT_TOKEN_PROBS.length,
+    };
+    return map[id] || 0;
+  }
+
+  function render() {
+    const phase = PHASES[currentPhase];
+    els.eduContent.innerHTML = getPhaseContent(currentPhase, animStep);
+    els.phaseNum.textContent = currentPhase + 1;
+    els.phaseTitle.textContent = phase.title;
+    els.progressFill.style.width = `${((currentPhase + 1) / PHASES.length) * 100}%`;
+
+    els.btnPrev.disabled = currentPhase === 0 && animStep === 0;
+    els.btnNext.disabled = currentPhase === PHASES.length - 1 && animStep >= getMaxSteps(currentPhase);
+
+    document.querySelectorAll('.phase-list li').forEach((li, i) => {
+      li.classList.toggle('active', i === currentPhase);
+      li.classList.toggle('done', i < currentPhase);
+    });
+  }
+
+  function buildPhaseList() {
+    els.phaseList.innerHTML = PHASES.map((p, i) =>
+      `<li data-idx="${i}">${i + 1}. ${p.title}</li>`
+    ).join('');
+    els.phaseList.querySelectorAll('li').forEach(li => {
+      li.addEventListener('click', () => {
+        stopPlay();
+        currentPhase = parseInt(li.dataset.idx, 10);
+        animStep = 0;
+        render();
+        runSubAnimations();
+      });
+    });
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    els.btnPlay.textContent = '▶ Play';
+    els.btnPlay.classList.add('primary');
+    if (playTimer) {
+      clearTimeout(playTimer);
+      playTimer = null;
+    }
+  }
+
+  function startPlay() {
+    isPlaying = true;
+    els.btnPlay.textContent = '⏸ Pause';
+    els.btnPlay.classList.add('primary');
+    scheduleNext();
+  }
+
+  function scheduleNext() {
+    if (!isPlaying) return;
+    const maxSteps = getMaxSteps(currentPhase);
+    const delay = maxSteps > 0 && animStep < maxSteps ? 600 : getSpeedMs();
+
+    playTimer = setTimeout(() => {
+      if (!isPlaying) return;
+      advance();
+      scheduleNext();
+    }, delay);
+  }
+
+  function advance() {
+    const maxSteps = getMaxSteps(currentPhase);
+    if (animStep < maxSteps) {
+      animStep++;
+      render();
+      runSubAnimations();
+    } else if (currentPhase < PHASES.length - 1) {
+      currentPhase++;
+      animStep = 0;
+      render();
+      runSubAnimations();
+    } else {
+      stopPlay();
+    }
+  }
+
+  function goBack() {
+    if (animStep > 0) {
+      animStep--;
+    } else if (currentPhase > 0) {
+      currentPhase--;
+      animStep = getMaxSteps(currentPhase);
+    }
+    render();
+    runSubAnimations();
+  }
+
+  function reset() {
+    stopPlay();
+    currentPhase = 0;
+    animStep = 0;
+    render();
+    runSubAnimations();
+  }
+
+  function runSubAnimations() {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.prob-row.visible .prob-bar-fill').forEach((fill, i) => {
+        const targetWidth = fill.style.width;
+        fill.style.width = '0%';
+        setTimeout(() => { fill.style.width = targetWidth; }, i * 120 + 50);
+      });
+      document.querySelectorAll('.heatmap-cell.pop').forEach((cell, i) => {
+        cell.classList.remove('pop');
+        void cell.offsetWidth;
+        setTimeout(() => cell.classList.add('pop'), i * 80);
+      });
+    });
+  }
+
+  els.btnNext.addEventListener('click', () => {
+    stopPlay();
+    advance();
+  });
+
+  els.btnPrev.addEventListener('click', () => {
+    stopPlay();
+    goBack();
+  });
+
+  els.btnPlay.addEventListener('click', () => {
+    if (isPlaying) stopPlay();
+    else startPlay();
+  });
+
+  els.btnReset.addEventListener('click', reset);
+
+  els.speedRange.addEventListener('input', () => getSpeedMs());
+
+  document.querySelector('.progress-bar').addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const idx = Math.min(PHASES.length - 1, Math.max(0, Math.floor(pct * PHASES.length)));
+    stopPlay();
+    currentPhase = idx;
+    animStep = 0;
+    render();
+    runSubAnimations();
+  });
+
+  function init() {
+    buildPhaseList();
+    getSpeedMs();
+    render();
+    runSubAnimations();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
